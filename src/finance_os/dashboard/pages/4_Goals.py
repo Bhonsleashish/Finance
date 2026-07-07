@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import datetime as dt
+
 import streamlit as st
 
-from finance_os.analysis.goals import all_goals_progress, create_or_update_goal
+from finance_os.analysis.goals import all_goals_progress, create_or_update_goal, record_contribution
 from finance_os.dashboard._shared import eur, get_conn, page_setup, pct
+from finance_os.db import repository as repo
 
 page_setup("Goals")
 
@@ -29,13 +32,19 @@ with st.expander("Add / update a goal"):
             conn.commit()
             st.success(f"Goal '{name}' saved.")
             st.cache_resource.clear()
+            st.rerun()
 
 goals = all_goals_progress(conn)
 if not goals:
     st.info("No goals yet — add one above (Emergency Fund is a good place to start).")
     st.stop()
 
+raw_goals = repo.list_goals(conn)  # carries the `id` column, needed for contribute/delete
+
 for g in goals:
+    goal_row = raw_goals[raw_goals["name"] == g.name].iloc[0]
+    goal_id = int(goal_row["id"])
+
     st.subheader(g.name)
     st.progress(min(g.progress_pct, 1.0))
     cols = st.columns(4)
@@ -44,6 +53,28 @@ for g in goals:
     cols[2].metric("Monthly contribution", eur(g.monthly_contribution))
     cols[3].metric("Est. completion", g.estimated_completion_date.isoformat() if g.estimated_completion_date else "n/a")
     if g.user_target_date:
-        status = "✅ on track" if g.on_track else "⚠️ behind schedule"
+        status = "on track" if g.on_track else "behind schedule"
         st.caption(f"Target date: {g.user_target_date} — {status}")
+
+    action_cols = st.columns([2, 1])
+    with action_cols[0].popover("Add contribution"):
+        with st.form(f"contribute_{goal_id}"):
+            amount = st.number_input("Amount (EUR)", min_value=0.0, step=25.0, key=f"amt_{goal_id}")
+            contributed_on = st.date_input("Date", value=dt.date.today(), key=f"date_{goal_id}")
+            do_contribute = st.form_submit_button("Add")
+            if do_contribute and amount > 0:
+                record_contribution(conn, g.name, amount, contributed_on.isoformat())
+                conn.commit()
+                st.success(f"Added {eur(amount)} to '{g.name}'.")
+                st.cache_resource.clear()
+                st.rerun()
+
+    with action_cols[1]:
+        if st.button("Delete goal", key=f"delete_{goal_id}"):
+            repo.deactivate_goal(conn, goal_id)
+            conn.commit()
+            st.success(f"Deleted '{g.name}'.")
+            st.cache_resource.clear()
+            st.rerun()
+
     st.divider()

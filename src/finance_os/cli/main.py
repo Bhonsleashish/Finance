@@ -31,6 +31,9 @@ app.add_typer(budget_app, name="budget")
 report_app = typer.Typer(help="Generate reviews and exports.")
 app.add_typer(report_app, name="report")
 
+expense_app = typer.Typer(help="Manually add, list or delete transactions.")
+app.add_typer(expense_app, name="expense")
+
 
 @app.command()
 def init() -> None:
@@ -98,6 +101,95 @@ def uncategorized() -> None:
     for _, row in df.iterrows():
         table.add_row(str(row["id"]), row["txn_date"], row["description_raw"], f"{row['amount']:,.2f}")
     console.print(table)
+
+
+@expense_app.command("add")
+def expense_add(
+    description: str,
+    amount: float = typer.Option(..., help="Positive for income, negative for an expense."),
+    date_: str = typer.Option(..., "--date", help="YYYY-MM-DD"),
+    category: str = typer.Option(None, help="Leave blank to auto-categorize."),
+    account: str = typer.Option("manual", help="Account name, e.g. 'Sparkasse Girokonto'."),
+) -> None:
+    """Manually record an expense or income transaction."""
+    from finance_os.db import repository as repo
+
+    with connect() as conn:
+        from finance_os.db.connection import init_db
+        init_db(conn)
+        categorizer = Categorizer(conn)
+        if category:
+            category_id = repo.get_or_create_category(conn, category)
+            merchant_id = None
+        else:
+            result = categorizer.categorize(description)
+            category_id, merchant_id = result.category_id, result.merchant_id
+        account_id = repo.get_or_create_account(conn, account)
+        direction = "income" if amount > 0 else "expense"
+        txn_id = repo.insert_transaction(
+            conn, txn_date=date_, description_raw=description, amount=amount, direction=direction,
+            account_id=account_id, category_id=category_id, merchant_id=merchant_id,
+            is_manual_entry=True, account_name=account,
+        )
+    if txn_id is None:
+        console.print("[yellow]Skipped — an identical transaction already exists (same date/amount/description/account).[/yellow]")
+    else:
+        console.print(f"[green]Added transaction {txn_id}: {description} ({amount:,.2f} EUR)[/green]")
+
+
+@expense_app.command("delete")
+def expense_delete(transaction_id: int) -> None:
+    """Delete a transaction by id."""
+    from finance_os.db import repository as repo
+
+    with connect() as conn:
+        from finance_os.db.connection import init_db
+        init_db(conn)
+        deleted = repo.delete_transaction(conn, transaction_id)
+    if deleted:
+        console.print(f"[green]Deleted transaction {transaction_id}.[/green]")
+    else:
+        console.print(f"[red]No transaction with id {transaction_id}[/red]")
+        raise typer.Exit(1)
+
+
+@expense_app.command("list")
+def expense_list(month: str = typer.Option(None, help="YYYY-MM, defaults to all history")) -> None:
+    """List transactions (optionally filtered to one month)."""
+    from finance_os.db import repository as repo
+
+    with connect() as conn:
+        from finance_os.db.connection import init_db
+        init_db(conn)
+        df = repo.get_transactions_df(conn, month, month)
+    if df.empty:
+        console.print("[yellow]No transactions found.[/yellow]")
+        return
+    df = df.copy()
+    df["txn_date"] = df["txn_date"].dt.strftime("%Y-%m-%d")
+    table = Table(title="Transactions")
+    for col in ("id", "txn_date", "description_raw", "merchant", "category", "amount", "account"):
+        table.add_column(col)
+    for _, row in df.iterrows():
+        table.add_row(*(str(row[c])[:40] for c in ("id", "txn_date", "description_raw", "merchant", "category", "amount", "account")))
+    console.print(table)
+
+
+@goals_app.command("delete")
+def goals_delete(name: str) -> None:
+    """Deactivate a goal (kept in history, hidden from lists/dashboard)."""
+    from finance_os.db import repository as repo
+
+    with connect() as conn:
+        from finance_os.db.connection import init_db
+        init_db(conn)
+        goals = repo.list_goals(conn)
+        row = goals[goals["name"] == name]
+        if row.empty:
+            console.print(f"[red]No active goal named '{name}'[/red]")
+            raise typer.Exit(1)
+        repo.deactivate_goal(conn, int(row.iloc[0]["id"]))
+    console.print(f"[green]Goal '{name}' deleted.[/green]")
 
 
 @budget_app.command("generate")

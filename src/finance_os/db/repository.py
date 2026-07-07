@@ -226,6 +226,11 @@ def get_transactions_df(
     return df
 
 
+def delete_transaction(conn: sqlite3.Connection, transaction_id: int) -> bool:
+    cur = conn.execute("DELETE FROM transactions WHERE id = ?", (transaction_id,))
+    return cur.rowcount > 0
+
+
 def uncategorized_transactions(conn: sqlite3.Connection) -> pd.DataFrame:
     return pd.read_sql_query(
         "SELECT id, txn_date, description_raw, amount FROM transactions WHERE category_id IS NULL ORDER BY txn_date",
@@ -321,6 +326,12 @@ def upsert_goal(
 
 def list_goals(conn: sqlite3.Connection) -> pd.DataFrame:
     return pd.read_sql_query("SELECT * FROM goals WHERE is_active = 1 ORDER BY created_at", conn)
+
+
+def deactivate_goal(conn: sqlite3.Connection, goal_id: int) -> None:
+    """Soft-delete: goals are kept (with their contribution history) but
+    hidden from list_goals()/the dashboard once deactivated."""
+    conn.execute("UPDATE goals SET is_active = 0 WHERE id = ?", (goal_id,))
 
 
 def contribute_to_goal(conn: sqlite3.Connection, goal_id: int, amount: float, contributed_on: str) -> None:
