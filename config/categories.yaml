@@ -1,0 +1,69 @@
+# =============================================================================
+# Expense categories.
+# `group` is used by the adaptive budgeting engine (needs / wants / savings).
+# `keywords` are lower-cased substrings matched against transaction
+# descriptions as a fallback when no merchant match is found.
+# =============================================================================
+
+categories:
+  Housing:
+    group: needs
+    keywords: [miete, rent, hausgeld, nebenkosten, kaltmiete, warmmiete, wohnung, immobilien]
+  Utilities:
+    group: needs
+    keywords: [strom, gas, wasser, stadtwerke, energie, internet, telekom, vodafone, o2, 1und1, "1&1"]
+  Groceries:
+    group: needs
+    keywords: [supermarkt, lebensmittel, rewe, edeka, lidl, aldi, kaufland, netto, penny, real, tegut, denns]
+  Restaurants:
+    group: wants
+    keywords: [restaurant, cafe, café, imbiss, lieferando, uber eats, bistro, bar, kneipe, bäckerei, baeckerei]
+  Transportation:
+    group: needs
+    keywords: [db bahn, deutsche bahn, bvg, mvv, hvv, vrr, rmv, uber, taxi, öpnv, oepnv, nahverkehr, ticket]
+  Fuel:
+    group: needs
+    keywords: [tankstelle, shell, aral, esso, jet, total, fuel, diesel, benzin]
+  "Miles Mobility":
+    group: wants
+    keywords: [miles mobility, "miles-mobility", carsharing, sharenow, share now, flinkster]
+  Amazon:
+    group: wants
+    keywords: [amazon, amzn]
+  Subscriptions:
+    group: wants
+    keywords: [netflix, spotify, disney, amazon prime, youtube premium, dazn, apple.com/bill, icloud, abo, abonnement]
+  Entertainment:
+    group: wants
+    keywords: [kino, cinema, concert, konzert, theater, steam, playstation, xbox, nintendo, spiele]
+  Education:
+    group: needs
+    keywords: [udemy, coursera, university, universität, uni, kurs, seminar, buch, bücher, school, schule]
+  Travel:
+    group: wants
+    keywords: [hotel, airbnb, booking.com, ryanair, lufthansa, easyjet, flight, flug, reise, hostel]
+  Healthcare:
+    group: needs
+    keywords: [apotheke, arzt, zahnarzt, praxis, krankenhaus, klinik, pharmacy, doctor]
+  Insurance:
+    group: needs
+    keywords: [versicherung, allianz, huk, axa, ergo, signal iduna, haftpflicht, hausrat]
+  Shopping:
+    group: wants
+    keywords: [zalando, h&m, hm, zara, media markt, mediamarkt, saturn, ikea, otto, decathlon]
+  Debt:
+    group: needs
+    keywords: [kredit, darlehen, rate, kreditkarte abrechnung, loan, klarna, ratenzahlung]
+  Savings:
+    group: savings
+    keywords: [sparen, tagesgeld, sparkonto, rücklage, ruecklage]
+  Investments:
+    group: savings
+    keywords: [trade republic, scalable capital, etf, depot, wertpapier, broker, degiro, comdirect depot]
+  Miscellaneous:
+    group: wants
+    keywords: []
+
+# Personal-care & household drugstore items map to Groceries-adjacent needs
+# but are common enough in Germany to warrant their own recognizer entries
+# (see merchants.yaml) — kept here for reference only.

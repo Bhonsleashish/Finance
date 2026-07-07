@@ -1,0 +1,45 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# --- Local financial data: NEVER commit personal data ---
+database/*.db
+database/*.db-journal
+database/*.sqlite
+database/*.sqlite3
+database/logs/
+data/salary_slips/*
+data/bank_statements/*
+data/receipts/*
+data/invoices/*
+data/insurance/*
+data/tax/*
+data/manual/*
+data/inbox/*
+data/exports/*
+!data/**/.gitkeep
+reports/weekly/*
+reports/monthly/*
+!reports/**/.gitkeep
+
+# Local overrides of config (may contain personal thresholds/goals)
+config/local.yaml
+config/secrets.yaml
+
+# --- Editor / OS ---
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# --- Streamlit ---
+.streamlit/secrets.toml

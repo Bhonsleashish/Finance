@@ -1,0 +1,95 @@
+# =============================================================================
+# Finance OS — main configuration
+# Everything here is local. No values in this file are ever sent anywhere.
+# =============================================================================
+
+app:
+  name: "Finance OS"
+  currency: "EUR"
+  locale: "de_DE"
+  timezone: "Europe/Berlin"
+
+# First month of the historical database. New documents before this date
+# are still imported, but recurring/trend logic starts counting from here.
+history:
+  start_month: "2026-01"
+
+paths:
+  root: "."
+  data_dir: "data"
+  database_file: "database/finance.db"
+  reports_dir: "reports"
+  exports_dir: "data/exports"
+  config_dir: "config"
+
+ocr:
+  # Tesseract language packs to use. "deu" = German, "eng" = English.
+  languages: "deu+eng"
+  # DPI to render PDF pages at before OCR when a PDF has no text layer.
+  render_dpi: 300
+  # If a PDF page yields fewer than this many characters of native text,
+  # treat it as a scanned page and fall back to OCR.
+  min_native_chars: 40
+
+# --- Emergency fund -----------------------------------------------------
+emergency_fund:
+  target_months_of_expenses: 6
+  # Category the emergency fund balance is tracked under (a "goal").
+  goal_name: "Emergency Fund"
+
+# --- Adaptive budgeting ---------------------------------------------------
+# The budgeting engine starts from these target allocations (percent of net
+# income) and adapts them each month based on fixed bills, seasonality and
+# recent actuals. See analysis/budgeting.py for the algorithm.
+budgeting:
+  target_allocation:
+    needs: 0.50       # Housing, utilities, groceries, insurance, transport, debt minimums
+    wants: 0.30        # Restaurants, entertainment, shopping, subscriptions, travel
+    savings: 0.20       # Savings, investments, extra debt payoff, emergency fund
+  # Categories considered "fixed"/non-discretionary (used to compute the
+  # baseline of unavoidable spending each month).
+  fixed_categories:
+    - Housing
+    - Utilities
+    - Insurance
+    - Debt
+    - Subscriptions
+  # Minimum months of history required before the engine trusts "recent
+  # spending" over the static target allocation.
+  min_history_months_for_adaptation: 2
+
+# --- Subscription detection -----------------------------------------------
+subscriptions:
+  # A merchant is flagged as a recurring subscription if it recurs at
+  # roughly this interval (days) at least `min_occurrences` times, within
+  # `amount_tolerance_pct` of the average amount.
+  interval_days_tolerance: 4
+  min_occurrences: 2
+  amount_tolerance_pct: 0.1
+  # Flag "unused" subscriptions if no matching transaction in this many days.
+  stale_after_days: 45
+
+# --- Smart alerts -----------------------------------------------------
+alerts:
+  spending_spike_pct: 0.3      # vs. trailing 3-month average for a category
+  subscription_increase_pct: 0.05
+  budget_exceeded_pct: 1.0      # 1.0 = 100% of budget
+  negative_cash_flow: true
+  salary_change_pct: 0.02
+  new_fee_min_amount: 1.0
+
+# --- Financial health score weights (0-100 total) -----------------------
+health_score:
+  weights:
+    savings_rate: 30
+    emergency_fund_coverage: 25
+    debt_to_income: 20
+    budget_adherence: 15
+    spending_stability: 10
+
+# --- Spending advisor -----------------------------------------------------
+advisor:
+  # A purchase is a "large purchase" if it exceeds this amount (EUR).
+  large_purchase_threshold: 150
+  # Assumed long-term annual real return used for opportunity-cost calc.
+  assumed_investment_return: 0.06

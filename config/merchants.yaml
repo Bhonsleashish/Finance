@@ -1,0 +1,61 @@
+# =============================================================================
+# German merchant recognizer.
+# Maps a canonical merchant name to matching patterns (substrings found in
+# raw bank-statement / receipt text, case-insensitive) and its default
+# category. The categorizer tries this table before falling back to
+# category keyword matching. Users can add entries here or let the app
+# learn new ones from manual corrections (stored in the DB, not this file).
+# =============================================================================
+
+merchants:
+  # --- Groceries & drugstores ---
+  REWE:            { category: Groceries, patterns: ["rewe"] }
+  EDEKA:           { category: Groceries, patterns: ["edeka"] }
+  Lidl:            { category: Groceries, patterns: ["lidl"] }
+  Aldi:            { category: Groceries, patterns: ["aldi"] }
+  Kaufland:        { category: Groceries, patterns: ["kaufland"] }
+  Netto:           { category: Groceries, patterns: ["netto"] }
+  Penny:           { category: Groceries, patterns: ["penny"] }
+  DM:              { category: Shopping, patterns: ["dm-drogerie", "dm drogerie", " dm "] }
+  Rossmann:        { category: Shopping, patterns: ["rossmann"] }
+
+  # --- Online / retail ---
+  Amazon:          { category: Amazon, patterns: ["amazon", "amzn"] }
+  Zalando:         { category: Shopping, patterns: ["zalando"] }
+  IKEA:            { category: Shopping, patterns: ["ikea"] }
+  MediaMarkt:      { category: Shopping, patterns: ["mediamarkt", "media markt"] }
+  Saturn:          { category: Shopping, patterns: ["saturn"] }
+  Otto:            { category: Shopping, patterns: ["otto.de", " otto "] }
+
+  # --- Mobility / transport ---
+  "Miles Mobility": { category: "Miles Mobility", patterns: ["miles mobility", "miles-mobility"] }
+  DB:              { category: Transportation, patterns: ["db vertrieb", "deutsche bahn", "bahn.de"] }
+  BVG:             { category: Transportation, patterns: ["bvg"] }
+  Uber:            { category: Transportation, patterns: ["uber *trip", "uber.com"] }
+
+  # --- Banks / payment processors ---
+  Sparkasse:       { category: Miscellaneous, patterns: ["sparkasse"] }
+  N26:             { category: Miscellaneous, patterns: ["n26"] }
+  ING:             { category: Miscellaneous, patterns: ["ing-diba", "ing bank", " ing "] }
+  Commerzbank:     { category: Miscellaneous, patterns: ["commerzbank"] }
+  DKB:             { category: Miscellaneous, patterns: ["dkb"] }
+  PayPal:          { category: Miscellaneous, patterns: ["paypal"] }
+
+  # --- Subscriptions / digital ---
+  Netflix:         { category: Subscriptions, patterns: ["netflix"] }
+  Spotify:         { category: Subscriptions, patterns: ["spotify"] }
+  "Amazon Prime":  { category: Subscriptions, patterns: ["amazon prime"] }
+  "Disney+":       { category: Subscriptions, patterns: ["disney plus", "disney+"] }
+  DAZN:            { category: Subscriptions, patterns: ["dazn"] }
+  Apple:           { category: Subscriptions, patterns: ["apple.com/bill", "apple services", "itunes"] }
+  Google:          { category: Subscriptions, patterns: ["google *", "google payment"] }
+
+  # --- Utilities / telecom ---
+  Telekom:         { category: Utilities, patterns: ["telekom"] }
+  Vodafone:        { category: Utilities, patterns: ["vodafone"] }
+  O2:              { category: Utilities, patterns: [" o2 ", "telefonica"] }
+
+  # --- Insurance ---
+  Allianz:         { category: Insurance, patterns: ["allianz"] }
+  HUK:             { category: Insurance, patterns: ["huk-coburg", "huk24"] }
+  AXA:             { category: Insurance, patterns: ["axa"] }
