@@ -7,7 +7,9 @@ Everything runs locally against database/finance.db. Run `finance --help`
 from __future__ import annotations
 
 import json
+from enum import Enum
 from pathlib import Path
+from typing import Optional
 
 import typer
 from rich.console import Console
@@ -18,6 +20,18 @@ from finance_os.config import load_settings
 from finance_os.db.connection import connect, ensure_initialized
 from finance_os.ingest.ingest_pipeline import ingest_path
 from finance_os.utils.dates import current_period_month
+
+
+class DocType(str, Enum):
+    payslip = "payslip"
+    bank_statement = "bank_statement"
+    csv_export = "csv_export"
+    receipt = "receipt"
+    invoice = "invoice"
+    insurance = "insurance"
+    tax = "tax"
+    investment = "investment"
+    screenshot = "screenshot"
 
 app = typer.Typer(add_completion=False, help="Finance OS — your offline personal finance operating system.")
 console = Console()
@@ -51,13 +65,22 @@ def init() -> None:
 @app.command()
 def ingest(
     path: Path = typer.Argument(..., help="File or folder to ingest (e.g. data/inbox, or a single PDF/CSV)."),
+    type_: Optional[DocType] = typer.Option(
+        None, "--type",
+        help="Force the document type instead of auto-detecting (e.g. a payslip that isn't in data/salary_slips/). "
+             "Only valid when `path` is a single file, not a folder.",
+    ),
 ) -> None:
     """Ingest payslips, bank statements, receipts, CSVs. Safe to re-run — duplicates are skipped."""
     with connect() as conn:
         from finance_os.db.connection import init_db
         init_db(conn)
         categorizer = Categorizer(conn)
-        results = ingest_path(conn, path, categorizer)
+        try:
+            results = ingest_path(conn, path, categorizer, doc_type=type_.value if type_ else None)
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1)
 
     table = Table(title=f"Ingestion results: {path}")
     table.add_column("File")

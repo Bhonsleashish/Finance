@@ -14,7 +14,11 @@ process and confirm it never opens a socket to anything but `localhost`.
 ## What it does
 
 - **Ingests** PDF salary slips, PDF/CSV bank statements, receipts and
-  screenshots (via OCR), extracting structured data automatically.
+  screenshots (via OCR), extracting structured data automatically. Drop
+  files in the matching `data/` subfolder for auto-detection, or use the
+  dashboard's **Upload** page (or `finance ingest --type`) to tell it
+  exactly what a document is — useful any time a file isn't sitting in the
+  "right" folder, or auto-detection would otherwise guess wrong.
 - **Parses German payslips** (Gehaltsabrechnung) into gross/net salary,
   income tax, solidarity surcharge, church tax, health/pension/unemployment/
   nursing-care insurance, overtime, bonuses and reimbursements — and
@@ -150,6 +154,9 @@ finance/
 ```bash
 finance init                                  # initialize the database
 finance ingest <file-or-folder>               # import documents (safe to re-run)
+finance ingest <file> --type payslip           # force the document type instead of auto-detecting
+                                                # (payslip | bank_statement | csv_export | receipt |
+                                                #  invoice | insurance | tax | investment | screenshot)
 finance uncategorized                         # list transactions needing a category
 finance categorize <txn_id> <category>        # correct a category (learns from it)
 finance budget generate --month YYYY-MM       # (re)generate the adaptive budget

@@ -2,6 +2,11 @@
 figures out the document type, extracts text (native/OCR), parses it,
 categorizes any transactions, and writes everything to the local database —
 with content-hash dedup so re-running ingestion on the same folder is safe.
+
+`doc_type` can always be forced explicitly (CLI `--type`, or the dashboard's
+Upload page) instead of relying on the folder-name/filename auto-detection
+in `guess_doc_type` — useful any time a file isn't sitting in the "right"
+data/ subfolder, or auto-detection would otherwise guess wrong.
 """
 
 from __future__ import annotations
@@ -23,6 +28,11 @@ from finance_os.utils.logging import get_logger
 logger = get_logger(__name__)
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".tiff", ".bmp"}
+
+DOC_TYPES = [
+    "payslip", "bank_statement", "csv_export", "receipt",
+    "invoice", "insurance", "tax", "investment", "screenshot",
+]
 
 DOC_TYPE_BY_FOLDER = {
     "salary_slips": "payslip",
@@ -74,9 +84,11 @@ def ingest_file(conn: sqlite3.Connection, path: Path, categorizer: Categorizer, 
         if doc_type == "csv_export":
             return _ingest_csv(conn, path, content_hash, categorizer)
         if path.suffix.lower() == ".pdf":
-            return _ingest_pdf(conn, path, content_hash, doc_type, categorizer)
+            extracted = extract_pdf(path)
+            return _handle_text_document(conn, path, content_hash, doc_type, extracted.text, extracted.method, categorizer)
         if path.suffix.lower() in IMAGE_EXTENSIONS:
-            return _ingest_image(conn, path, content_hash, doc_type, categorizer)
+            extracted = extract_image(path)
+            return _handle_text_document(conn, path, content_hash, doc_type, extracted.text, "ocr", categorizer)
         return IngestResult(file=path, doc_type=doc_type, status="failed", message="Unsupported file type")
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to ingest %s", path)
@@ -84,14 +96,20 @@ def ingest_file(conn: sqlite3.Connection, path: Path, categorizer: Categorizer, 
         return IngestResult(file=path, doc_type=doc_type, status="failed", message=str(exc))
 
 
-def _ingest_pdf(conn: sqlite3.Connection, path: Path, content_hash: str, doc_type: str, categorizer: Categorizer) -> IngestResult:
-    extracted = extract_pdf(path)
-    text = extracted.text
-
+def _handle_text_document(
+    conn: sqlite3.Connection, path: Path, content_hash: str, doc_type: str,
+    text: str, extraction_method: str, categorizer: Categorizer,
+) -> IngestResult:
+    """Shared parsing path for anything that isn't a CSV: PDFs and images
+    (post-OCR) are handled identically from this point on, driven entirely
+    by `doc_type` — a payslip photo and a payslip PDF go through the same
+    payslip parser, a bank-statement screenshot goes through the same
+    statement parser as a bank-statement PDF, etc.
+    """
     if doc_type == "payslip":
         parsed = parse_payslip_text(text)
         document_id = repo.insert_document(
-            conn, doc_type, str(path), content_hash, parsed.period_month, extracted.method, text,
+            conn, doc_type, str(path), content_hash, parsed.period_month, extraction_method, text,
             status="needs_review" if parsed.needs_review else "processed",
         )
         if parsed.period_month:
@@ -101,23 +119,23 @@ def _ingest_pdf(conn: sqlite3.Connection, path: Path, content_hash: str, doc_typ
                              message=f"Matched {parsed.matched_field_count} fields for {parsed.period_month or 'unknown period'}")
 
     if doc_type == "investment":
-        return _handle_investment_doc(conn, path, content_hash, text, extracted.method)
+        return _handle_investment_doc(conn, path, content_hash, text, extraction_method)
 
     if doc_type == "bank_statement":
         txns = parse_statement_text(text)
         document_id = repo.insert_document(conn, doc_type, str(path), content_hash,
                                             txns[0].txn_date.strftime("%Y-%m") if txns else None,
-                                            extracted.method, text)
+                                            extraction_method, text)
         added = _store_transactions(conn, document_id, path.stem, txns, categorizer)
         status = "imported" if txns else "needs_review"
         return IngestResult(file=path, doc_type=doc_type, status=status, transactions_added=added,
                              message=f"{added} transactions imported")
 
-    # receipt / invoice / insurance / tax: extract merchant/date/total, store as one transaction
+    # receipt / invoice / insurance / tax / screenshot: extract merchant/date/total, store as one transaction
     receipt = parse_receipt_text(text)
     document_id = repo.insert_document(
         conn, doc_type, str(path), content_hash,
-        receipt.txn_date.strftime("%Y-%m") if receipt.txn_date else None, extracted.method, text,
+        receipt.txn_date.strftime("%Y-%m") if receipt.txn_date else None, extraction_method, text,
         status="needs_review" if not (receipt.txn_date and receipt.amount) else "processed",
     )
     added = 0
@@ -132,7 +150,6 @@ def _ingest_pdf(conn: sqlite3.Connection, path: Path, content_hash: str, doc_typ
             document_id=document_id,
             merchant_id=cat.merchant_id,
             category_id=cat.category_id,
-            account_name="",
         )
         added = 1 if txn_id else 0
     status = "imported" if added else "needs_review"
@@ -157,34 +174,6 @@ def _handle_investment_doc(conn: sqlite3.Connection, path: Path, content_hash: s
                                      f"EUR {abs(parsed.amount):,.2f}) — please verify in the dashboard.")
     return IngestResult(file=path, doc_type="investment", status="needs_review",
                          message="Could not confidently extract an amount/date — add this investment manually.")
-
-
-def _ingest_image(conn: sqlite3.Connection, path: Path, content_hash: str, doc_type: str, categorizer: Categorizer) -> IngestResult:
-    extracted = extract_image(path)
-    if doc_type == "investment":
-        return _handle_investment_doc(conn, path, content_hash, extracted.text, "ocr")
-    receipt = parse_receipt_text(extracted.text)
-    document_id = repo.insert_document(
-        conn, doc_type, str(path), content_hash,
-        receipt.txn_date.strftime("%Y-%m") if receipt.txn_date else None, "ocr", extracted.text,
-        status="needs_review" if not (receipt.txn_date and receipt.amount) else "processed",
-    )
-    added = 0
-    if receipt.txn_date and receipt.amount:
-        cat = categorizer.categorize(receipt.merchant_guess or path.stem)
-        txn_id = repo.insert_transaction(
-            conn,
-            txn_date=receipt.txn_date.isoformat(),
-            description_raw=receipt.merchant_guess or path.stem,
-            amount=-abs(receipt.amount),
-            direction="expense",
-            document_id=document_id,
-            merchant_id=cat.merchant_id,
-            category_id=cat.category_id,
-        )
-        added = 1 if txn_id else 0
-    status = "imported" if added else "needs_review"
-    return IngestResult(file=path, doc_type=doc_type, status=status, transactions_added=added)
 
 
 def _ingest_csv(conn: sqlite3.Connection, path: Path, content_hash: str, categorizer: Categorizer) -> IngestResult:
@@ -220,13 +209,19 @@ def _store_transactions(conn: sqlite3.Connection, document_id: int, account_name
     return added
 
 
-def ingest_path(conn: sqlite3.Connection, path: Path, categorizer: Categorizer | None = None) -> list[IngestResult]:
-    """Ingest a single file or every supported file in a directory tree."""
+def ingest_path(
+    conn: sqlite3.Connection, path: Path, categorizer: Categorizer | None = None, doc_type: str | None = None,
+) -> list[IngestResult]:
+    """Ingest a single file or every supported file in a directory tree.
+    `doc_type` forces the type for a single file; it cannot be used with a
+    directory (a folder may contain a mix of document types)."""
     categorizer = categorizer or Categorizer(conn)
     results: list[IngestResult] = []
     if path.is_file():
-        results.append(ingest_file(conn, path, categorizer))
+        results.append(ingest_file(conn, path, categorizer, doc_type=doc_type))
     else:
+        if doc_type:
+            raise ValueError("doc_type can only be forced for a single file, not a folder.")
         supported = {".pdf", ".csv", *IMAGE_EXTENSIONS}
         for file_path in sorted(path.rglob("*")):
             if file_path.is_file() and file_path.suffix.lower() in supported and not file_path.name.startswith("."):
