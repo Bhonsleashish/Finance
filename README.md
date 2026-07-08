@@ -11,6 +11,17 @@ calls anywhere in this codebase (including Streamlit's own usage-stats ping,
 which is disabled in `.streamlit/config.toml`). You can `strace`/firewall the
 process and confirm it never opens a socket to anything but `localhost`.
 
+## Opening it (no terminal needed)
+
+On a Mac, double-click **`Open Finance Dashboard.command`** in this folder.
+First time, it sets itself up (a minute or two) and asks you to choose a
+password. After that, double-clicking it just opens your dashboard — your
+browser opens automatically, and it also prints an address you can use from
+your phone (same Wi-Fi). Leave that window open while you use the
+dashboard; closing it stops the dashboard. Everything below this section is
+for the command line, if you ever want it — you don't need any of it for
+day-to-day use.
+
 ## What it does
 
 - **Ingests** PDF salary slips, PDF/CSV bank statements, receipts and

@@ -544,7 +544,7 @@ def auth_set_password() -> None:
 
 @auth_app.command("status")
 def auth_status() -> None:
-    """Check whether a dashboard password is currently set."""
+    """Check whether a dashboard password is currently set. Exits 0 if set, 1 if not (so scripts can branch on it)."""
     from finance_os import auth
 
     if auth.is_password_set():
@@ -552,6 +552,7 @@ def auth_status() -> None:
     else:
         console.print("[yellow]No dashboard password is set — anyone who can reach the dashboard can use it. "
                        "Run `finance auth set-password` to set one.[/yellow]")
+        raise typer.Exit(1)
 
 
 @auth_app.command("clear")
