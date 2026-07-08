@@ -190,7 +190,7 @@ def _store_transactions(conn: sqlite3.Connection, document_id: int, account_name
     account_id = repo.get_or_create_account(conn, account_name)
     added = 0
     for txn in txns:
-        cat = categorizer.categorize(txn.description)
+        cat = categorizer.categorize(txn.description, category_hint=getattr(txn, "category_hint", None))
         direction = "income" if txn.amount > 0 else "expense"
         txn_id = repo.insert_transaction(
             conn,

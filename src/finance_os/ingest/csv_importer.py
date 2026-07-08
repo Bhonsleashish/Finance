@@ -28,6 +28,7 @@ class ParsedTransaction:
     txn_date: date
     description: str
     amount: float
+    category_hint: str | None = None
 
 
 def _find_column(columns: list[str], candidates: list[str]) -> str | None:

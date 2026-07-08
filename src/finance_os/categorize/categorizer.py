@@ -62,7 +62,7 @@ class Categorizer:
             self._merchant_names.setdefault(m["id"], m["name"])
         self._categories = load_categories()
 
-    def categorize(self, description: str) -> CategorizationResult:
+    def categorize(self, description: str, category_hint: str | None = None) -> CategorizationResult:
         norm = _normalize(description)
 
         # 1. exact/substring pattern match
@@ -109,7 +109,21 @@ class Categorizer:
                         confidence="keyword",
                     )
 
-        # 4. fallback
+        # 4. bank-provided category hint (e.g. N26 tags each transaction with
+        # its own category like "Lebensmittel" — better than giving up when
+        # our own merchant/keyword matching comes up empty).
+        if category_hint:
+            category_id = repo.get_category_id(self.conn, category_hint)
+            if category_id:
+                return CategorizationResult(
+                    merchant_id=None,
+                    merchant_name=None,
+                    category_id=category_id,
+                    category_name=category_hint,
+                    confidence="bank_hint",
+                )
+
+        # 5. fallback
         category_id = repo.get_category_id(self.conn, FALLBACK_CATEGORY)
         return CategorizationResult(
             merchant_id=None,

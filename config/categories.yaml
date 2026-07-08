@@ -11,7 +11,7 @@ categories:
     keywords: [miete, rent, hausgeld, nebenkosten, kaltmiete, warmmiete, wohnung, immobilien]
   Utilities:
     group: needs
-    keywords: [strom, gas, wasser, stadtwerke, energie, internet, telekom, vodafone, o2, 1und1, "1&1"]
+    keywords: [strom, gas, wasser, stadtwerke, energie, internet, telekom, vodafone, o2, 1und1, "1&1", rundfunk]
   Groceries:
     group: needs
     keywords: [supermarkt, lebensmittel, rewe, edeka, lidl, aldi, kaufland, netto, penny, real, tegut, denns]
@@ -47,7 +47,7 @@ categories:
     keywords: [apotheke, arzt, zahnarzt, praxis, krankenhaus, klinik, pharmacy, doctor]
   Insurance:
     group: needs
-    keywords: [versicherung, allianz, huk, axa, ergo, signal iduna, haftpflicht, hausrat]
+    keywords: [versicherung, allianz, huk, axa, ergo, signal iduna, haftpflicht, hausrat, krankenkasse]
   Shopping:
     group: wants
     keywords: [zalando, h&m, hm, zara, media markt, mediamarkt, saturn, ikea, otto, decathlon]
