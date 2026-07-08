@@ -343,6 +343,64 @@ def contribute_to_goal(conn: sqlite3.Connection, goal_id: int, amount: float, co
 
 
 # ---------------------------------------------------------------------------
+# investments
+# ---------------------------------------------------------------------------
+
+
+def add_investment(
+    conn: sqlite3.Connection,
+    name: str,
+    purchase_date: str,
+    amount_invested: float,
+    asset_type: str = "other",
+    broker: Optional[str] = None,
+    quantity: Optional[float] = None,
+    current_value: Optional[float] = None,
+    currency: str = "EUR",
+    document_id: Optional[int] = None,
+    notes: Optional[str] = None,
+) -> int:
+    value_updated_at = datetime.utcnow().isoformat(sep=" ", timespec="seconds") if current_value is not None else None
+    cur = conn.execute(
+        """INSERT INTO investments
+           (document_id, name, asset_type, broker, purchase_date, quantity, amount_invested,
+            current_value, currency, value_updated_at, notes)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            document_id, name, asset_type, broker, purchase_date, quantity, amount_invested,
+            current_value, currency, value_updated_at, notes,
+        ),
+    )
+    return cur.lastrowid
+
+
+def update_investment_value(conn: sqlite3.Connection, investment_id: int, current_value: float) -> bool:
+    value_updated_at = datetime.utcnow().isoformat(sep=" ", timespec="seconds")
+    cur = conn.execute(
+        "UPDATE investments SET current_value = ?, value_updated_at = ? WHERE id = ?",
+        (current_value, value_updated_at, investment_id),
+    )
+    return cur.rowcount > 0
+
+
+def deactivate_investment(conn: sqlite3.Connection, investment_id: int) -> None:
+    conn.execute("UPDATE investments SET is_active = 0 WHERE id = ?", (investment_id,))
+
+
+def delete_investment(conn: sqlite3.Connection, investment_id: int) -> bool:
+    cur = conn.execute("DELETE FROM investments WHERE id = ?", (investment_id,))
+    return cur.rowcount > 0
+
+
+def get_investments_df(conn: sqlite3.Connection, active_only: bool = True) -> pd.DataFrame:
+    query = "SELECT * FROM investments"
+    if active_only:
+        query += " WHERE is_active = 1"
+    query += " ORDER BY purchase_date"
+    return pd.read_sql_query(query, conn)
+
+
+# ---------------------------------------------------------------------------
 # budgets
 # ---------------------------------------------------------------------------
 

@@ -31,7 +31,6 @@ with st.expander("Add / update a goal"):
             )
             conn.commit()
             st.success(f"Goal '{name}' saved.")
-            st.cache_resource.clear()
             st.rerun()
 
 goals = all_goals_progress(conn)
@@ -66,7 +65,6 @@ for g in goals:
                 record_contribution(conn, g.name, amount, contributed_on.isoformat())
                 conn.commit()
                 st.success(f"Added {eur(amount)} to '{g.name}'.")
-                st.cache_resource.clear()
                 st.rerun()
 
     with action_cols[1]:
@@ -74,7 +72,6 @@ for g in goals:
             repo.deactivate_goal(conn, goal_id)
             conn.commit()
             st.success(f"Deleted '{g.name}'.")
-            st.cache_resource.clear()
             st.rerun()
 
     st.divider()

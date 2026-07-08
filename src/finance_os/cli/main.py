@@ -34,6 +34,9 @@ app.add_typer(report_app, name="report")
 expense_app = typer.Typer(help="Manually add, list or delete transactions.")
 app.add_typer(expense_app, name="expense")
 
+investment_app = typer.Typer(help="Track investments/holdings.")
+app.add_typer(investment_app, name="investment")
+
 
 @app.command()
 def init() -> None:
@@ -175,6 +178,22 @@ def expense_list(month: str = typer.Option(None, help="YYYY-MM, defaults to all 
     console.print(table)
 
 
+@app.command()
+def income(month: str = typer.Option(current_period_month(), help="YYYY-MM")) -> None:
+    """Estimate total income for a month (confirmed so far + projected remainder)."""
+    from finance_os.analysis.salary import estimate_month_income
+
+    with connect() as conn:
+        from finance_os.db.connection import init_db
+        init_db(conn)
+        est = estimate_month_income(conn, month)
+
+    console.print(f"\n[bold]Estimated income for {month}[/bold]  (basis: {est.basis})\n")
+    console.print(f"  Received so far:    EUR {est.received_so_far:,.2f}")
+    console.print(f"  Remaining expected: EUR {est.remaining_expected:,.2f}")
+    console.print(f"  [bold]Estimated total:    EUR {est.estimated_total:,.2f}[/bold]")
+
+
 @goals_app.command("delete")
 def goals_delete(name: str) -> None:
     """Deactivate a goal (kept in history, hidden from lists/dashboard)."""
@@ -190,6 +209,98 @@ def goals_delete(name: str) -> None:
             raise typer.Exit(1)
         repo.deactivate_goal(conn, int(row.iloc[0]["id"]))
     console.print(f"[green]Goal '{name}' deleted.[/green]")
+
+
+@investment_app.command("add")
+def investment_add(
+    name: str,
+    amount: float = typer.Option(..., help="Amount invested (cost basis, EUR)."),
+    date_: str = typer.Option(..., "--date", help="Purchase date, YYYY-MM-DD"),
+    asset_type: str = typer.Option("other", help="stock | etf | crypto | fund | bond | other"),
+    broker: str = typer.Option(None),
+    quantity: float = typer.Option(None, help="Number of shares/coins, if known."),
+    current_value: float = typer.Option(None, help="Current value, if known (defaults to cost basis)."),
+) -> None:
+    """Record an investment purchase."""
+    from finance_os.db import repository as repo
+
+    with connect() as conn:
+        from finance_os.db.connection import init_db
+        init_db(conn)
+        inv_id = repo.add_investment(
+            conn, name, date_, amount, asset_type=asset_type, broker=broker,
+            quantity=quantity, current_value=current_value,
+        )
+    console.print(f"[green]Recorded investment {inv_id}: {name} — EUR {amount:,.2f} on {date_}[/green]")
+
+
+@investment_app.command("list")
+def investment_list() -> None:
+    """Show all holdings with cost basis, current value and unrealized gain/loss."""
+    from finance_os.analysis.investments import holdings_df, portfolio_summary
+
+    with connect() as conn:
+        from finance_os.db.connection import init_db
+        init_db(conn)
+        df = holdings_df(conn)
+        summary = portfolio_summary(conn)
+
+    if df.empty:
+        console.print("[yellow]No investments recorded yet. Use `finance investment add`.[/yellow]")
+        return
+
+    table = Table(title="Holdings")
+    for col in ("id", "name", "asset_type", "purchase_date", "amount_invested", "effective_value", "unrealized_gain"):
+        table.add_column(col)
+    for _, row in df.iterrows():
+        marker = " (est.)" if row["value_is_estimated"] else ""
+        table.add_row(
+            str(row["id"]), row["name"], row["asset_type"], row["purchase_date"],
+            f"{row['amount_invested']:,.2f}", f"{row['effective_value']:,.2f}{marker}",
+            f"{row['unrealized_gain']:+,.2f}",
+        )
+    console.print(table)
+    gain_pct = f"{summary.unrealized_gain_pct:+.1%}" if summary.unrealized_gain_pct is not None else "n/a"
+    console.print(
+        f"\nTotal invested: EUR {summary.total_invested:,.2f}  |  "
+        f"Current value: EUR {summary.total_current_value:,.2f}  |  "
+        f"Unrealized: EUR {summary.unrealized_gain:+,.2f} ({gain_pct})"
+    )
+    if summary.stale_value_count:
+        console.print(f"[yellow]{summary.stale_value_count} holding(s) still valued at cost — "
+                       f"update with `finance investment update-value <id> <current_value>`.[/yellow]")
+
+
+@investment_app.command("update-value")
+def investment_update_value(investment_id: int, current_value: float) -> None:
+    """Update a holding's current market value."""
+    from finance_os.db import repository as repo
+
+    with connect() as conn:
+        from finance_os.db.connection import init_db
+        init_db(conn)
+        updated = repo.update_investment_value(conn, investment_id, current_value)
+    if updated:
+        console.print(f"[green]Updated investment {investment_id} to EUR {current_value:,.2f}.[/green]")
+    else:
+        console.print(f"[red]No investment with id {investment_id}[/red]")
+        raise typer.Exit(1)
+
+
+@investment_app.command("delete")
+def investment_delete(investment_id: int) -> None:
+    """Delete an investment record."""
+    from finance_os.db import repository as repo
+
+    with connect() as conn:
+        from finance_os.db.connection import init_db
+        init_db(conn)
+        deleted = repo.delete_investment(conn, investment_id)
+    if deleted:
+        console.print(f"[green]Deleted investment {investment_id}.[/green]")
+    else:
+        console.print(f"[red]No investment with id {investment_id}[/red]")
+        raise typer.Exit(1)
 
 
 @budget_app.command("generate")
@@ -292,6 +403,20 @@ def advise(item: str, cost: float) -> None:
         console.print(f"  - {reason}")
     if evaluation.cheaper_alternative_hint:
         console.print(f"\n[cyan]{evaluation.cheaper_alternative_hint}[/cyan]")
+
+
+@app.command()
+def tips(month: str = typer.Option(current_period_month(), help="YYYY-MM")) -> None:
+    """Money-management suggestions, ranked by priority (emergency fund -> debt -> savings rate -> ...)."""
+    from finance_os.analysis.coaching import money_management_tips
+
+    with connect() as conn:
+        from finance_os.db.connection import init_db
+        init_db(conn)
+        for tip in money_management_tips(conn, month):
+            console.print(f"\n[bold cyan]{tip.priority}. {tip.title}[/bold cyan]")
+            console.print(f"   {tip.detail}")
+    console.print()
 
 
 @app.command()

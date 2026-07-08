@@ -14,7 +14,9 @@ import streamlit as st
 from finance_os.analysis.alerts import evaluate_alerts
 from finance_os.analysis.cashflow import monthly_summary, spending_by_category
 from finance_os.analysis.health_score import compute_health_score
+from finance_os.analysis.investments import portfolio_summary
 from finance_os.analysis.networth import estimate_net_worth_from_cashflow, net_worth_trend
+from finance_os.analysis.salary import estimate_month_income
 from finance_os.dashboard._shared import eur, get_conn, page_setup, pct
 from finance_os.utils.dates import current_period_month
 
@@ -38,6 +40,14 @@ col1.metric("Income", eur(row["income"]))
 col2.metric("Expenses", eur(row["expenses"]))
 col3.metric("Net cash flow", eur(row["net_cashflow"]))
 col4.metric("Savings rate", pct(row["savings_rate"]))
+
+if selected_month == current_period_month():
+    income_est = estimate_month_income(conn, selected_month)
+    ic1, ic2, ic3 = st.columns(3)
+    ic1.metric("Received so far this month", eur(income_est.received_so_far))
+    ic2.metric("Remaining expected", eur(income_est.remaining_expected))
+    ic3.metric("Estimated total income", eur(income_est.estimated_total))
+    st.caption(f"Estimate basis: {income_est.basis.replace('_', ' ')}")
 
 st.subheader("Cash flow trend")
 fig = go.Figure()
@@ -70,6 +80,17 @@ with col_b:
     else:
         fig3 = px.line(nw, x="snapshot_date", y="net_worth")
         st.plotly_chart(fig3, use_container_width=True)
+
+portfolio = portfolio_summary(conn)
+if portfolio.holdings_count:
+    st.subheader("Investments")
+    pc1, pc2, pc3 = st.columns(3)
+    pc1.metric("Invested", eur(portfolio.total_invested))
+    pc2.metric("Current value", eur(portfolio.total_current_value))
+    gain_label = f"{portfolio.unrealized_gain_pct:+.1%}" if portfolio.unrealized_gain_pct is not None else None
+    pc3.metric("Unrealized gain/loss", eur(portfolio.unrealized_gain), delta=gain_label)
+    if portfolio.stale_value_count:
+        st.caption(f"{portfolio.stale_value_count} holding(s) still valued at cost — update on the Investments page.")
 
 st.subheader("Financial health score")
 health = compute_health_score(conn, selected_month)

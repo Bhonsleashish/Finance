@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS documents (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     doc_type        TEXT NOT NULL CHECK (doc_type IN (
                         'payslip', 'bank_statement', 'csv_export', 'receipt',
-                        'invoice', 'insurance', 'tax', 'screenshot', 'manual'
+                        'invoice', 'insurance', 'tax', 'screenshot', 'manual', 'investment'
                     )),
     source_path     TEXT NOT NULL,
     content_hash    TEXT NOT NULL UNIQUE,
@@ -212,6 +212,31 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     recommend_cancel            INTEGER NOT NULL DEFAULT 0,
     UNIQUE (merchant_id, label)
 );
+
+-- ---------------------------------------------------------------------------
+-- investments: individual holdings/lots (stocks, ETFs, crypto, funds, ...).
+-- current_value is manually updated (this app never calls a live price
+-- API); when it's NULL, analysis code treats the position as valued at cost.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS investments (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id         INTEGER REFERENCES documents(id) ON DELETE SET NULL,
+    name                TEXT NOT NULL,               -- e.g. "VWCE", "Bitcoin", "Apple Inc."
+    asset_type          TEXT NOT NULL DEFAULT 'other'
+                            CHECK (asset_type IN ('stock','etf','crypto','fund','bond','other')),
+    broker              TEXT,                          -- e.g. "Trade Republic", "Scalable Capital"
+    purchase_date       TEXT NOT NULL,                   -- 'YYYY-MM-DD'
+    quantity            REAL,
+    amount_invested     REAL NOT NULL,                    -- cost basis, in `currency`
+    current_value       REAL,                              -- manually updated mark-to-market; NULL = value at cost
+    currency            TEXT NOT NULL DEFAULT 'EUR',
+    value_updated_at    TEXT,
+    is_active           INTEGER NOT NULL DEFAULT 1,
+    notes               TEXT,
+    created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_investments_name ON investments(name);
 
 -- ---------------------------------------------------------------------------
 -- alerts: generated smart-alert log (so we don't repeat the same alert).

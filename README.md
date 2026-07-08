@@ -32,6 +32,18 @@ process and confirm it never opens a socket to anything but `localhost`.
   Buy now / Wait / Avoid — with the math shown.
 - **Detects subscriptions** automatically and flags stale or duplicate ones
   for cancellation.
+- **Estimates income for the current month** — confirmed amounts already
+  received plus a projected remainder, based on parsed payslips or your
+  transaction history.
+- **Tracks investments** (stocks, ETFs, crypto, funds): cost basis, manually
+  updated current value (this app never calls a live market-data API),
+  unrealized gain/loss and allocation. Add a purchase via the dashboard/CLI,
+  or drop a broker screenshot in `data/investments/` for a best-effort draft
+  entry you confirm afterward.
+- **Coaches you on money management**: a priority-ranked list of suggestions
+  (starter emergency fund -> high-interest debt -> full emergency fund ->
+  investing -> savings rate -> subscriptions -> lifestyle inflation) applied
+  to your actual numbers, with the reasoning shown.
 - **Forecasts** your balance, savings, net worth and debt payoff over
   1/3/6/12/60-month horizons.
 - **Generates weekly and monthly reviews**, plus CSV/Excel/PDF exports and an
@@ -67,6 +79,7 @@ finance/
     salary_slips/      # drop payslip PDFs here
     bank_statements/    # drop bank statement PDFs here
     receipts/            # drop receipt/invoice photos & PDFs here
+    investments/           # drop broker purchase screenshots here (draft entries, needs review)
     invoices/, insurance/, tax/, manual/, inbox/
     exports/              # CSV/Excel exports land here
   database/
@@ -92,7 +105,17 @@ finance budget generate --month YYYY-MM       # (re)generate the adaptive budget
 finance budget status --month YYYY-MM         # budget vs. actual
 finance goals add <name> --goal-type ... --target-amount ...
 finance goals list
+finance goals delete <name>
+finance expense add "<description>" --amount <±EUR> --date YYYY-MM-DD
+finance expense list --month YYYY-MM
+finance expense delete <transaction_id>
+finance investment add <name> --amount <EUR> --date YYYY-MM-DD [--asset-type etf|stock|crypto|...]
+finance investment list                       # holdings, cost basis, current value, gain/loss
+finance investment update-value <id> <current_value>
+finance investment delete <id>
+finance income --month YYYY-MM                # estimated income: received so far + projected remainder
 finance advise "<item>" <cost>                # should I buy this?
+finance tips                                  # priority-ranked money-management suggestions
 finance forecast --balance <current-balance>  # 1/3/6/12/60-month projections
 finance report weekly
 finance report monthly --month YYYY-MM --export-pdf

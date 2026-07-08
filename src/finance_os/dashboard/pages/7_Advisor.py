@@ -3,12 +3,22 @@ from __future__ import annotations
 import streamlit as st
 
 from finance_os.analysis.advisor import evaluate_purchase
+from finance_os.analysis.coaching import money_management_tips
 from finance_os.dashboard._shared import eur, get_conn, page_setup
 
 page_setup("Spending Advisor")
 
 conn = get_conn()
 
+st.subheader("Money-management suggestions")
+st.caption("Ranked by priority — the standard order of operations (starter emergency fund, then high-interest debt, then a full emergency fund, then investing) applied to your actual numbers.")
+for tip in money_management_tips(conn):
+    with st.container(border=True):
+        st.markdown(f"**{tip.priority}. {tip.title}**")
+        st.write(tip.detail)
+
+st.divider()
+st.subheader("Should I buy this?")
 st.write("Tell me what you want to buy, and I'll evaluate it against your budget, emergency fund and goals.")
 
 with st.form("advisor_form"):

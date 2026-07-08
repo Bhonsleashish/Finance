@@ -14,6 +14,7 @@ from finance_os.categorize.categorizer import Categorizer
 from finance_os.db import repository as repo
 from finance_os.ingest.bank_statement_parser import parse_statement_text
 from finance_os.ingest.csv_importer import parse_csv
+from finance_os.ingest.investment_parser import parse_investment_text
 from finance_os.ingest.payslip_parser import parse_payslip_text
 from finance_os.ingest.pdf_extractor import extract_image, extract_pdf
 from finance_os.ingest.receipt_parser import parse_receipt_text
@@ -30,6 +31,7 @@ DOC_TYPE_BY_FOLDER = {
     "invoices": "invoice",
     "insurance": "insurance",
     "tax": "tax",
+    "investments": "investment",
     "inbox": None,  # auto-detect
 }
 
@@ -98,6 +100,9 @@ def _ingest_pdf(conn: sqlite3.Connection, path: Path, content_hash: str, doc_typ
         return IngestResult(file=path, doc_type=doc_type, status=status,
                              message=f"Matched {parsed.matched_field_count} fields for {parsed.period_month or 'unknown period'}")
 
+    if doc_type == "investment":
+        return _handle_investment_doc(conn, path, content_hash, text, extracted.method)
+
     if doc_type == "bank_statement":
         txns = parse_statement_text(text)
         document_id = repo.insert_document(conn, doc_type, str(path), content_hash,
@@ -134,8 +139,30 @@ def _ingest_pdf(conn: sqlite3.Connection, path: Path, content_hash: str, doc_typ
     return IngestResult(file=path, doc_type=doc_type, status=status, transactions_added=added)
 
 
+def _handle_investment_doc(conn: sqlite3.Connection, path: Path, content_hash: str, text: str, extraction_method: str) -> IngestResult:
+    parsed = parse_investment_text(text)
+    document_id = repo.insert_document(
+        conn, "investment", str(path), content_hash,
+        parsed.purchase_date.strftime("%Y-%m") if parsed.purchase_date else None, extraction_method, text,
+        status="needs_review",  # broker screenshots vary too much to trust without a human check
+    )
+    if parsed.purchase_date and parsed.amount:
+        repo.add_investment(
+            conn, name=parsed.name_guess or path.stem, purchase_date=parsed.purchase_date.isoformat(),
+            amount_invested=abs(parsed.amount), broker=parsed.broker_guess, document_id=document_id,
+            notes="Auto-extracted from a screenshot — please verify the name, amount and date.",
+        )
+        return IngestResult(file=path, doc_type="investment", status="needs_review",
+                             message=f"Draft investment recorded ({parsed.name_guess or path.stem}, "
+                                     f"EUR {abs(parsed.amount):,.2f}) — please verify in the dashboard.")
+    return IngestResult(file=path, doc_type="investment", status="needs_review",
+                         message="Could not confidently extract an amount/date — add this investment manually.")
+
+
 def _ingest_image(conn: sqlite3.Connection, path: Path, content_hash: str, doc_type: str, categorizer: Categorizer) -> IngestResult:
     extracted = extract_image(path)
+    if doc_type == "investment":
+        return _handle_investment_doc(conn, path, content_hash, extracted.text, "ocr")
     receipt = parse_receipt_text(extracted.text)
     document_id = repo.insert_document(
         conn, doc_type, str(path), content_hash,

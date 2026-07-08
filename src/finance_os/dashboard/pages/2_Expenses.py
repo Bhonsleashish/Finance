@@ -47,7 +47,6 @@ with st.expander("Add a manual transaction"):
                     st.warning("Skipped — an identical transaction already exists (same date/amount/description/account).")
                 else:
                     st.success(f"Added transaction {txn_id}.")
-                    st.cache_resource.clear()
                     st.rerun()
 
 df = repo.get_transactions_df(conn)
@@ -90,7 +89,6 @@ with col_correct:
                 categorizer.learn_correction(int(txn_id), row["description_raw"], new_category)
                 conn.commit()
                 st.success(f"Transaction {txn_id} recategorized as '{new_category}'.")
-                st.cache_resource.clear()
                 st.rerun()
 
 with col_delete:
@@ -106,7 +104,6 @@ with col_delete:
             elif repo.delete_transaction(conn, int(delete_id)):
                 conn.commit()
                 st.success(f"Deleted transaction {delete_id}.")
-                st.cache_resource.clear()
                 st.rerun()
             else:
                 st.error(f"No transaction with id {delete_id}")

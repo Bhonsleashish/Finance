@@ -25,6 +25,7 @@ data/insurance/*
 data/tax/*
 data/manual/*
 data/inbox/*
+data/investments/*
 data/exports/*
 !data/**/.gitkeep
 reports/weekly/*
