@@ -6,6 +6,7 @@ import streamlit as st
 
 from finance_os.analysis.goals import all_goals_progress, create_or_update_goal, record_contribution
 from finance_os.dashboard._shared import eur, get_conn, page_setup, pct
+from finance_os.dashboard.theme import STATUS, status_badge
 from finance_os.db import repository as repo
 
 page_setup("Goals")
@@ -44,8 +45,18 @@ for g in goals:
     goal_row = raw_goals[raw_goals["name"] == g.name].iloc[0]
     goal_id = int(goal_row["id"])
 
-    st.subheader(g.name)
-    st.progress(min(g.progress_pct, 1.0))
+    badge = ""
+    if g.user_target_date:
+        badge = status_badge("On track", "good") if g.on_track else status_badge("Behind schedule", "critical")
+    elif g.progress_pct >= 1.0:
+        badge = status_badge("Complete", "good")
+    st.markdown(f"### {g.name}  {badge}", unsafe_allow_html=True)
+    progress_color = STATUS["good"] if g.progress_pct >= 0.66 else STATUS["warning"] if g.progress_pct >= 0.33 else STATUS["critical"]
+    st.markdown(
+        f'<div style="background:#e1e0d9;border-radius:6px;height:10px;overflow:hidden;margin-bottom:8px;">'
+        f'<div style="width:{min(g.progress_pct, 1.0) * 100:.1f}%;background:{progress_color};height:100%;"></div></div>',
+        unsafe_allow_html=True,
+    )
     cols = st.columns(4)
     cols[0].metric("Progress", pct(g.progress_pct))
     cols[1].metric("Current / Target", f"{eur(g.current_amount)} / {eur(g.target_amount)}")

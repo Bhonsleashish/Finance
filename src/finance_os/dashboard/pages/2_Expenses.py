@@ -8,6 +8,7 @@ import streamlit as st
 from finance_os.categorize.categorizer import Categorizer
 from finance_os.config import load_categories
 from finance_os.dashboard._shared import eur, get_conn, page_setup
+from finance_os.dashboard.theme import category_color_map
 from finance_os.db import repository as repo
 
 page_setup("Expense Tracking")
@@ -68,7 +69,9 @@ st.subheader("Spending trend by category")
 expenses = df[df["direction"] == "expense"].copy()
 expenses["category"] = expenses["category"].fillna("Uncategorized")
 trend = expenses.groupby(["period_month", "category"])["amount"].sum().abs().reset_index()
-fig = px.bar(trend, x="period_month", y="amount", color="category")
+colors = category_color_map(trend["category"].unique().tolist())
+fig = px.bar(trend, x="period_month", y="amount", color="category", color_discrete_map=colors)
+fig.update_layout(legend=dict(orientation="h", y=-0.2), height=420)
 st.plotly_chart(fig, use_container_width=True)
 
 col_correct, col_delete = st.columns(2)

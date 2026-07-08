@@ -7,6 +7,7 @@ import streamlit as st
 
 from finance_os.analysis.investments import allocation_by_holding, holdings_df, portfolio_summary
 from finance_os.dashboard._shared import eur, get_conn, page_setup
+from finance_os.dashboard.theme import category_color_map
 from finance_os.db import repository as repo
 
 page_setup("Investments")
@@ -59,7 +60,10 @@ if summary.stale_value_count:
 
 st.subheader("Allocation")
 alloc = allocation_by_holding(conn)
-fig = px.pie(alloc, names="name", values="value", hole=0.4)
+colors = category_color_map(alloc["name"].tolist())
+fig = px.pie(alloc, names="name", values="value", hole=0.45, color="name", color_discrete_map=colors)
+fig.update_traces(textinfo="label+percent", textposition="outside")
+fig.update_layout(showlegend=False, height=380)
 st.plotly_chart(fig, use_container_width=True)
 
 st.subheader("Holdings")

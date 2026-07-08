@@ -6,5 +6,13 @@ gatherUsageStats = false
 [server]
 headless = true
 
+# Colors mirror the validated palette in src/finance_os/dashboard/theme.py
+# (categorical slot 1 = primary, chart surfaces, ink). Keep the two in sync
+# if either changes.
 [theme]
-primaryColor = "#2E7D32"
+base = "light"
+primaryColor = "#2a78d6"
+backgroundColor = "#fcfcfb"
+secondaryBackgroundColor = "#f0efec"
+textColor = "#0b0b0b"
+font = "sans serif"
