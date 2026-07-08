@@ -37,6 +37,9 @@ app.add_typer(expense_app, name="expense")
 investment_app = typer.Typer(help="Track investments/holdings.")
 app.add_typer(investment_app, name="investment")
 
+auth_app = typer.Typer(help="Manage the dashboard's local login password.")
+app.add_typer(auth_app, name="auth")
+
 
 @app.command()
 def init() -> None:
@@ -497,6 +500,51 @@ def report_export(
     console.print(f"[green]Exported to {path}[/green]")
 
 
+@auth_app.command("set-password")
+def auth_set_password() -> None:
+    """Set (or change) the password required to open the dashboard."""
+    from finance_os import auth
+
+    password = typer.prompt("New dashboard password", hide_input=True)
+    confirm = typer.prompt("Confirm password", hide_input=True)
+    if password != confirm:
+        console.print("[red]Passwords didn't match — nothing was changed.[/red]")
+        raise typer.Exit(1)
+    try:
+        auth.set_password(password)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1)
+    console.print(f"[green]Password set. It's stored (salted + hashed) in {auth.SECRETS_PATH}, "
+                   f"which is gitignored and never committed. The dashboard will now require it.[/green]")
+
+
+@auth_app.command("status")
+def auth_status() -> None:
+    """Check whether a dashboard password is currently set."""
+    from finance_os import auth
+
+    if auth.is_password_set():
+        console.print("[green]A dashboard password is set.[/green]")
+    else:
+        console.print("[yellow]No dashboard password is set — anyone who can reach the dashboard can use it. "
+                       "Run `finance auth set-password` to set one.[/yellow]")
+
+
+@auth_app.command("clear")
+def auth_clear() -> None:
+    """Remove the dashboard password (dashboard becomes unprotected again)."""
+    from finance_os import auth
+
+    confirm = typer.confirm("This removes password protection from the dashboard. Continue?")
+    if not confirm:
+        raise typer.Exit(0)
+    if auth.clear_password():
+        console.print("[green]Password removed.[/green]")
+    else:
+        console.print("[yellow]No password was set.[/yellow]")
+
+
 def _guess_lan_ip() -> str:
     """Best-effort local network IP, for printing a phone-friendly URL.
     Uses a UDP socket "connect" purely to ask the OS which interface it
@@ -528,16 +576,26 @@ def dashboard(
     import subprocess
     import sys
 
+    from finance_os import auth
+
+    if network and not auth.is_password_set():
+        console.print("[red]Refusing to start with --network: no dashboard password is set.[/red]")
+        console.print("Anyone who can reach this port would have full access to your financial data. "
+                       "Set one first:\n\n  finance auth set-password\n")
+        raise typer.Exit(1)
+
     dashboard_path = Path(__file__).resolve().parent.parent / "dashboard" / "app.py"
     cmd = [sys.executable, "-m", "streamlit", "run", str(dashboard_path), "--server.port", str(port)]
 
     if network:
         cmd += ["--server.address", "0.0.0.0"]
         lan_ip = _guess_lan_ip()
-        console.print(f"[yellow]Serving on your local network — no login is required to reach this dashboard.[/yellow]")
-        console.print(f"[yellow]Only do this on a network you trust (e.g. your home Wi-Fi).[/yellow]")
+        console.print(f"[yellow]Serving on your local network — password login is required.[/yellow]")
         console.print(f"On your phone (same Wi-Fi), open: [bold]http://{lan_ip}:{port}[/bold]\n")
     else:
+        if not auth.is_password_set():
+            console.print("[yellow]No dashboard password set. Run `finance auth set-password` to add one "
+                           "(recommended even for localhost-only use).[/yellow]")
         console.print(f"Serving on localhost only. Open: [bold]http://localhost:{port}[/bold]")
         console.print("Run with --network to also make it reachable from your phone on the same Wi-Fi.\n")
 

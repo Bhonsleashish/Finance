@@ -67,35 +67,56 @@ finance report monthly             # generate this month's review
 finance dashboard                  # launch the local Streamlit UI
 ```
 
-## Accessing it from your phone
+## Accessing it from your phone (or any other device)
 
-`finance dashboard` binds to `localhost` only by default — nothing but this
-machine can reach it. To use it from your phone too, without deploying to
-any cloud service:
+### 1. Set a password
+
+The dashboard has no login by default. Set one first — this is required
+before `--network` will even start:
+
+```bash
+finance auth set-password     # prompts twice, stores a salted PBKDF2 hash
+                               # locally in config/secrets.yaml (gitignored,
+                               # never committed, never leaves this machine)
+finance auth status            # check whether one is set
+finance auth clear              # remove it again
+```
+
+Once a password is set, every dashboard page — on localhost or over the
+network — shows a login screen first. Logging in unlocks the whole app for
+that browser session; there's a "Log out" button in the sidebar. Failed
+attempts are throttled with a short delay after 3 tries.
+
+### 2. Reach it from another device
 
 ```bash
 finance dashboard --network          # binds to 0.0.0.0 instead of localhost
 ```
 
-This prints a URL like `http://192.168.1.23:8501` — open that in your
+This prints a URL like `http://192.168.1.23:8501` — open that on your
 phone's browser while it's on the **same Wi-Fi** as the computer. Traffic
-never leaves your home network.
+stays on your home network; the password is the only thing standing between
+that URL and your data, so pick a real one (`finance auth set-password`
+requires 6+ characters, but longer is better).
 
-**There is no login on this dashboard.** `--network` makes it reachable by
-anything on that network, so only use it on Wi-Fi you trust (not a coffee
-shop or hotel network), and don't forward the port through your router to
-the public internet.
+### 3. Access away from home
 
-If you want access away from home too, the local-first-compatible option is
-a private mesh VPN like [Tailscale](https://tailscale.com) or
-[WireGuard](https://www.wireguard.com/) — your phone and computer talk to
+For access when you're not on the same Wi-Fi, without deploying to any
+cloud service, use a private mesh VPN like [Tailscale](https://tailscale.com)
+or [WireGuard](https://www.wireguard.com/) — your phone and computer talk to
 each other directly (end-to-end), with no third party ever seeing your
 financial data, just the connection metadata needed to establish it. Run
 `finance dashboard --network` and reach it via the VPN's IP instead of your
-LAN IP. Deploying to a public cloud host (Streamlit Community Cloud, etc.)
-would work too, but contradicts the "never leaves my computer" requirement
-this project was built around — only go that route if you deliberately want
-to change that tradeoff.
+LAN IP; the password gate still applies on top of that.
+
+Avoid forwarding the port through your router to the raw public internet —
+Streamlit serves plain HTTP (no built-in TLS), so the password would travel
+in cleartext to anyone positioned to intercept it. If you want internet
+access without a VPN, put a reverse proxy with a real TLS certificate (e.g.
+Caddy with Let's Encrypt) in front of it. Deploying to a public cloud host
+(Streamlit Community Cloud, etc.) would also work, but contradicts the
+"never leaves my computer" requirement this project was built around — only
+go that route if you deliberately want to change that tradeoff.
 
 Everything works fully offline after `pip install`. See `ARCHITECTURE.md` for
 how the pieces fit together and where to extend the system (new merchants,
@@ -150,7 +171,11 @@ finance forecast --balance <current-balance>  # 1/3/6/12/60-month projections
 finance report weekly
 finance report monthly --month YYYY-MM --export-pdf
 finance report export --fmt csv|excel
-finance dashboard                             # launch the Streamlit UI
+finance auth set-password                     # protect the dashboard with a password
+finance auth status
+finance auth clear
+finance dashboard                             # launch the Streamlit UI (localhost only)
+finance dashboard --network                   # also reachable from your phone/other devices (requires a password)
 ```
 
 ## Running tests
