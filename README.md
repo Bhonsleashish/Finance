@@ -67,6 +67,36 @@ finance report monthly             # generate this month's review
 finance dashboard                  # launch the local Streamlit UI
 ```
 
+## Accessing it from your phone
+
+`finance dashboard` binds to `localhost` only by default — nothing but this
+machine can reach it. To use it from your phone too, without deploying to
+any cloud service:
+
+```bash
+finance dashboard --network          # binds to 0.0.0.0 instead of localhost
+```
+
+This prints a URL like `http://192.168.1.23:8501` — open that in your
+phone's browser while it's on the **same Wi-Fi** as the computer. Traffic
+never leaves your home network.
+
+**There is no login on this dashboard.** `--network` makes it reachable by
+anything on that network, so only use it on Wi-Fi you trust (not a coffee
+shop or hotel network), and don't forward the port through your router to
+the public internet.
+
+If you want access away from home too, the local-first-compatible option is
+a private mesh VPN like [Tailscale](https://tailscale.com) or
+[WireGuard](https://www.wireguard.com/) — your phone and computer talk to
+each other directly (end-to-end), with no third party ever seeing your
+financial data, just the connection metadata needed to establish it. Run
+`finance dashboard --network` and reach it via the VPN's IP instead of your
+LAN IP. Deploying to a public cloud host (Streamlit Community Cloud, etc.)
+would work too, but contradicts the "never leaves my computer" requirement
+this project was built around — only go that route if you deliberately want
+to change that tradeoff.
+
 Everything works fully offline after `pip install`. See `ARCHITECTURE.md` for
 how the pieces fit together and where to extend the system (new merchants,
 new payslip layouts, new categories, custom rules).

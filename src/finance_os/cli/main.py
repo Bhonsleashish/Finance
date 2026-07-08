@@ -497,14 +497,51 @@ def report_export(
     console.print(f"[green]Exported to {path}[/green]")
 
 
+def _guess_lan_ip() -> str:
+    """Best-effort local network IP, for printing a phone-friendly URL.
+    Uses a UDP socket "connect" purely to ask the OS which interface it
+    would route through — this sends no packets anywhere (UDP connect() is
+    a local kernel call), consistent with this app making no network calls."""
+    import socket
+
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("10.255.255.255", 1))
+            return s.getsockname()[0]
+        finally:
+            s.close()
+    except Exception:  # noqa: BLE001
+        return "<your-computer's-LAN-IP>"
+
+
 @app.command()
-def dashboard() -> None:
+def dashboard(
+    network: bool = typer.Option(
+        False, "--network",
+        help="Bind to 0.0.0.0 so devices on your local network (e.g. your phone) can reach it. "
+             "There is no login on this dashboard — only use this on a network you trust.",
+    ),
+    port: int = typer.Option(8501, help="Port to serve on."),
+) -> None:
     """Launch the local Streamlit dashboard."""
     import subprocess
     import sys
 
     dashboard_path = Path(__file__).resolve().parent.parent / "dashboard" / "app.py"
-    subprocess.run([sys.executable, "-m", "streamlit", "run", str(dashboard_path)])
+    cmd = [sys.executable, "-m", "streamlit", "run", str(dashboard_path), "--server.port", str(port)]
+
+    if network:
+        cmd += ["--server.address", "0.0.0.0"]
+        lan_ip = _guess_lan_ip()
+        console.print(f"[yellow]Serving on your local network — no login is required to reach this dashboard.[/yellow]")
+        console.print(f"[yellow]Only do this on a network you trust (e.g. your home Wi-Fi).[/yellow]")
+        console.print(f"On your phone (same Wi-Fi), open: [bold]http://{lan_ip}:{port}[/bold]\n")
+    else:
+        console.print(f"Serving on localhost only. Open: [bold]http://localhost:{port}[/bold]")
+        console.print("Run with --network to also make it reachable from your phone on the same Wi-Fi.\n")
+
+    subprocess.run(cmd)
 
 
 if __name__ == "__main__":
